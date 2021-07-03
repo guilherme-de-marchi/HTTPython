@@ -1,5 +1,6 @@
 import socket
-import command_class
+import request_class
+import http_functions
 
 class Server(socket.socket):
     def __init__(self) -> None:
@@ -14,11 +15,21 @@ class Server(socket.socket):
         self.shutdown()
         self.close()
 
-    def thread(self, client):
-        while True:
-            data = client.recv(1024)
-            command_response = command_class.Command(data)
-            response = f'HTTP/1.1 200 OK\r\n\r\n{command_response.execute()}'.encode()
-            print(response)
-            client.send(response)
-            client.close()
+    def execute_http_request(self, request: dict) -> None:
+        assert isinstance(request, dict)
+
+        method = http_functions.methods[request['header']['line'][0]]
+        target = request['header']['line'][1]
+
+        response = method(target, request['header']['headers'])
+
+        return response
+
+    def thread(self, client) -> None:
+        brute_request = client.recv(1024)
+        request = request_class.Request(brute_request)
+
+        response = self.execute_http_request(request.request).get()
+        client.send(response.encode())
+
+        client.close()
